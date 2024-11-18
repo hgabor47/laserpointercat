@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CAT LASER CONTROLLER</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            resize: vertical;
+            font-family: monospace;
+        }
+        .svg-container {
+            border: 1px solid #ccc;
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        .controls input[type="text"] {
+            width: 200px;
+            padding: 5px;
+            margin-right: 10px;
+        }
+        .controls button {
+            padding: 5px 10px;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        polygon {
+            fill: rgba(0, 150, 255, 0.3);
+            stroke: #0096FF;
+            stroke-width: 2;
+        }
+    </style>
+</head>
+<body>
+    <h1>CAT LASER CONTROLLER</h1>
+    
+    <form action='/upload' method='POST'>
+        <label for="ssid">SSID:</label> 
+        <input type='text' id="ssid" name='ssid' value='@currentSSID'><br><br>
+        
+        <label for="password">Password:</label> 
+        <input type='password' id="password" name='password'><br><br>
+        
+        <button type='submit'>OK</button>
+    </form>
+    
+    <form action='/uploadProgram' method='POST'>
+        <label for="program">Program:</label><br>
+        <textarea id="program" name='program'>@currentProgram</textarea><br>
+        <button type='submit'>Upload</button>
+    </form>
+
+    <form action='/reset' method='POST'>
+        <button type='submit'>Reset</button>
+    </form>
+    
+    <!-- Új div blokk -->
+    <div class="controls">
+        <label for="programName">Új program neve:</label>
+        <input type="text" id="programName" placeholder="Program neve">
+        <button id="clearBtn">CLEAR</button>
+    </div>
+    
+    <div class="svg-container">
+        <svg id="drawingArea">
+            <!-- Poligon megjelenítése itt -->
+        </svg>
+    </div>
+    
+    <script>
+        // Program JSON struktúra
+        let programs = {
+            "progs":[
+                {
+                    "name":"prog1",
+                    "lines":[
+                        {"cmd": "MOVE", "mot": 0, "pos": 90, "tim": 2000, "lock": false},
+                        {"cmd": "MOVE", "mot": 1, "pos": 45, "tim": 2000, "lock": true},
+                        {"cmd": "WAIT", "tim": 500},
+                        {"cmd": "MOVE", "mot": 0, "pos": 0, "tim": 2000, "lock": false},
+                        {"cmd": "MOVE", "mot": 1, "pos": 0, "tim": 2000, "lock": true},
+                        {"cmd": "WAIT", "tim": 500},
+                        {"cmd": "LOOP", "line": 0, "cnt": "3"},
+                        {"cmd": "CALL", "name": "prog2"},
+                        {"cmd": "GOTO", "name": "prog1"}
+                    ]
+                },
+                {
+                    "name":"prog2",
+                    "lines":[
+                        {"cmd": "MOVE", "mot": 0, "pos": 45, "tim": 200, "lock": false},
+                        {"cmd": "MOVE", "mot": 1, "pos": 45, "tim": 200, "lock": true},
+                        {"cmd": "WAIT", "tim": 1000}          
+                    ]
+                }
+            ]
+        };
+
+        const svg = document.getElementById('drawingArea');
+        const clearBtn = document.getElementById('clearBtn');
+        const programNameInput = document.getElementById('programName');
+        const programTextarea = document.getElementById('program');
+        let points = [];
+        let polygonElement = null;
+
+        // Kattintás kezelése az SVG területen
+        svg.addEventListener('click', function(event) {
+            const rect = svg.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            points.push({x, y});
+            drawPolygon();
+            updateProgramJSON();
+        });
+
+        // CLEAR gomb kezelése
+        clearBtn.addEventListener('click', function() {
+            points = [];
+            if (polygonElement) {
+                svg.removeChild(polygonElement);
+                polygonElement = null;
+            }
+            updateProgramJSON();
+        });
+
+        // Poligon rajzolása
+        function drawPolygon() {
+            if (polygonElement) {
+                svg.removeChild(polygonElement);
+            }
+            if (points.length < 2) return;
+            polygonElement = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            const pointsAttr = points.map(p => `${p.x},${p.y}`).join(" ");
+            polygonElement.setAttribute("points", pointsAttr);
+            svg.appendChild(polygonElement);
+        }
+
+        // Program JSON frissítése
+        function updateProgramJSON() {
+            const programName = programNameInput.value.trim();
+            if (!programName) {
+                alert('Kérjük, adja meg az új program nevét a "Új program neve" mezőben.');
+                return;
+            }
+
+            // Generált parancsok a pontok alapján
+            let lines = [];
+            points.forEach((point, index) => {
+                lines.push({"cmd": "MOVE", "mot": 0, "pos": Math.min(Math.round((point.x / svg.clientWidth) * 90), 90), "tim": 2000, "lock": false});
+                lines.push({"cmd": "MOVE", "mot": 1, "pos": Math.min(Math.round((point.y / svg.clientHeight) * 90), 90), "tim": 2000, "lock": true});
+                lines.push({"cmd": "WAIT", "tim": 500});
+            });
+            // Visszavezetés az első pontra
+            if (points.length > 0) {
+                lines.push({"cmd": "GOTO", "name": programName});
+            }
+
+            // Keresés a megfelelő programban
+            let program = programs.progs.find(p => p.name === programName);
+            if (!program) {
+                // Ha nem létezik, létrehozzuk
+                program = {"name": programName, "lines": []};
+                programs.progs.push(program);
+            }
+            // Frissítjük a lines mezőt
+            program.lines = lines;
+
+            // Frissítjük a textarea tartalmát a speciális formázással
+            programTextarea.value = formatProgramJSON(programs);
+        }
+
+        // Speciális JSON formázás
+        function formatProgramJSON(obj) {
+            return JSON.stringify(obj, null, 2)
+                .replace(/(\{[^{}]*\})/g, function(match) {
+                    return match.replace(/\n\s*/g, ' ');
+                });
+        }
+
+        // Inicializálás a meglévő program betöltéséhez
+        window.onload = function() {
+            try {
+                programs = JSON.parse(programTextarea.value);
+            } catch (e) {
+                console.error('Hibás JSON a program textarea-ban.');
+            }
+        };
+    </script>
+</body>
+</html>

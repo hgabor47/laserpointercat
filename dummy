@@ -1,0 +1,18 @@
+        JsonArray linesArray = progObj.createNestedArray("lines");
+        for (const auto& cmd : prog.lines) {
+            JsonObject cmdObj = linesArray.createNestedObject();            
+            cmdObj["cmd"] = cmd.cmd;
+            if (cmd.cmd=="MOVE"){
+              cmdObj["mot"] = cmd.mot;
+              cmdObj["pos"] = cmd.pos;
+              cmdObj["tim"] = cmd.tim;
+            }else if (cmd.cmd=="MOVE"){
+              cmdObj["tim"] = cmd.tim;
+            } else if (cmd.cmd=="LOOP"){
+              cmdObj["line"] = cmd.line;
+              cmdObj["cnt"] = cmd.cnt;
+            } else if (cmd.cmd=="CALL" || cmd.cmd=="GOTO"){
+              cmdObj["name"] = cmd.name;
+              cmdObj["lock"] = cmd.lock;
+            }
+        }
