@@ -142,7 +142,10 @@ String HTMLO = R"rawliteral(
             const rect = svg.getBoundingClientRect();
             const x = Math.max(0, Math.min(event.clientX - rect.left, svg.clientWidth));
             const y = Math.max(0, Math.min(event.clientY - rect.top, svg.clientHeight));
-            points.push({ x, y });
+            let t = programTimeInput.valueAsNumber;
+            if (t<50) t=50;
+            
+            points.push({ x, y,t });
             drawPolygon();
             updateProgramJSON();
         });
@@ -187,16 +190,11 @@ String HTMLO = R"rawliteral(
                 return;
             }
 
-            if (programTime < 50) {
-                alert('Program time cannot be less than 50.');
-                return;
-            }
-
             let lines = [];
             points.forEach((point) => {
-                lines.push({'cmd': 'MOVE', 'mot': 1, 'pos': Math.min(Math.round((point.x / svg.clientWidth) * 90), 90), 'tim': programTime, 'lock': false});
-                lines.push({'cmd': 'MOVE', 'mot': 0, 'pos': Math.min(Math.round((point.y / svg.clientHeight) * 90), 90), 'tim': programTime, 'lock': true});
-                lines.push({'cmd': 'WAIT', 'tim': programTime});
+                lines.push({'cmd': 'MOVE', 'mot': 1, 'pos': Math.min(Math.round((point.x / svg.clientWidth) * 90), 90), 'tim': point.t, 'lock': false});
+                lines.push({'cmd': 'MOVE', 'mot': 0, 'pos': Math.min(Math.round((point.y / svg.clientHeight) * 90), 90), 'tim': point.t, 'lock': true});
+                lines.push({'cmd': 'WAIT', 'tim': point.t});
             });
 
             if (points.length > 0) {
@@ -261,9 +259,6 @@ String HTMLO = R"rawliteral(
                 ).join(',\n')}\n${indent}}`;
             }
         }
-
-
-
 
 
 
